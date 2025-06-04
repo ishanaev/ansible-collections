@@ -1,0 +1,112 @@
+---
+- name: Управление LXC контейнерами на Proxmox
+  hosts: proxmox
+  gather_facts: no
+  vars:
+    proxmox_api_host: "{{ ansible_host }}"
+    proxmox_api_user: "root@pam"
+    proxmox_api_password: "your_password"  # Рекомендуется использовать vault
+    proxmox_node: "pve"  # Имя вашего Proxmox ноды
+    containers:
+      - name: "container1"
+        vmid: 200
+        cores: 2
+        memory: 1024
+        swap: 512
+        ostype: "ubuntu"
+        ostemplate: "local:vztmpl/ubuntu-20.04-standard_20.04-1_amd64.tar.gz"
+        net:
+          net0: "name=eth0,bridge=vmbr0,ip=dhcp"
+        rootfs: "local-lvm:8"
+        onboot: 1
+        unprivileged: 0
+        features:
+          nesting: 1
+          keyctl: 1
+        start: 1
+        users:
+          - username: "admin"
+            password: "secure_password"
+            groups: "sudo,adm"
+            shell: "/bin/bash"
+      - name: "container2"
+        vmid: 201
+        cores: 1
+        memory: 512
+        swap: 256
+        ostype: "debian"
+        ostemplate: "local:vztmpl/debian-11-standard_11.3-1_amd64.tar.gz"
+        net:
+          net0: "name=eth0,bridge=vmbr0,ip=dhcp"
+        rootfs: "local-lvm:4"
+        onboot: 1
+        unprivileged: 1
+        features:
+          nesting: 0
+          keyctl: 0
+        start: 1
+        users:
+          - username: "app_user"
+            password: "app_password"
+            groups: "www-data"
+            shell: "/bin/bash"
+
+  roles:
+    - role: proxmox_auth
+
+  tasks:
+    - name: Создание LXC контейнеров
+      community.general.proxmox_lxc:
+        api_host: "{{ proxmox_api_host }}"
+        api_user: "{{ proxmox_api_user }}"
+        api_password: "{{ proxmox_api_password }}"
+        node: "{{ proxmox_node }}"
+        name: "{{ item.name }}"
+        vmid: "{{ item.vmid }}"
+        cores: "{{ item.cores }}"
+        memory: "{{ item.memory }}"
+        swap: "{{ item.swap }}"
+        ostype: "{{ item.ostype }}"
+        ostemplate: "{{ item.ostemplate }}"
+        rootfs: "{{ item.rootfs }}"
+        onboot: "{{ item.onboot }}"
+        unprivileged: "{{ item.unprivileged }}"
+        features: "{{ item.features }}"
+        start: "{{ item.start }}"
+        state: present
+        validate_certs: no
+      loop: "{{ containers }}"
+      register: container_result
+
+    - name: Вывод информации о созданных контейнерах
+      debug:
+        msg: "LXC контейнер {{ item.item.name }} (ID: {{ item.item.vmid }}) создан"
+      loop: "{{ container_result.results }}"
+      when: item.changed
+
+    - name: Ожидание запуска контейнеров
+      pause:
+        seconds: 30
+      when: item.changed
+      loop: "{{ container_result.results }}"
+
+    - name: Настройка контейнеров
+      include_role:
+        name: proxmox_network
+      vars:
+        vmid: "{{ item.item.vmid }}"
+        container_type: "lxc"
+        net_config: "{{ item.item.net }}"
+      loop: "{{ container_result.results }}"
+      when: item.changed
+
+    - name: Управление пользователями
+      include_role:
+        name: proxmox_users
+      vars:
+        vmid: "{{ item.item.vmid }}"
+        users: "{{ item.item.users }}"
+      loop: "{{ container_result.results }}"
+      when: 
+        - item.changed
+        - item.item.users is defined 

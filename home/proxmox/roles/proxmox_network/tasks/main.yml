@@ -1,0 +1,25 @@
+---
+- name: Настройка сети для контейнера/VM
+  community.general.proxmox_lxc:
+    api_host: "{{ proxmox_api_host }}"
+    api_user: "{{ proxmox_api_user }}"
+    api_password: "{{ proxmox_api_password }}"
+    node: "{{ proxmox_node }}"
+    vmid: "{{ vmid }}"
+    state: present
+    validate_certs: no
+    net: "{{ net_config }}"
+  when: net_config is defined
+
+- name: Настройка DNS для контейнера
+  community.general.proxmox_lxc:
+    api_host: "{{ proxmox_api_host }}"
+    api_user: "{{ proxmox_api_user }}"
+    api_password: "{{ proxmox_api_password }}"
+    node: "{{ proxmox_node }}"
+    vmid: "{{ vmid }}"
+    state: present
+    validate_certs: no
+    nameserver: "{{ nameserver | default('8.8.8.8') }}"
+    searchdomain: "{{ searchdomain | default('local') }}"
+  when: container_type == 'lxc' 

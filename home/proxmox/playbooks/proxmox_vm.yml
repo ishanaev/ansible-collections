@@ -1,0 +1,62 @@
+---
+- name: Управление виртуальными машинами на Proxmox
+  hosts: proxmox
+  gather_facts: no
+  vars:
+    proxmox_api_host: "{{ ansible_host }}"
+    proxmox_api_user: "root@pam"
+    proxmox_api_password: "your_password"  # Рекомендуется использовать vault
+    proxmox_node: "pve"  # Имя вашего Proxmox ноды
+    vms:
+      - name: "vm1"
+        vmid: 100
+        cores: 2
+        memory: 2048
+        ostype: "l26"
+        net:
+          net0: "virtio,bridge=vmbr0"
+        disk:
+          scsi0: "local-lvm:32,format=raw"
+        onboot: 1
+        agent: 1
+        autostart: 1
+      - name: "vm2"
+        vmid: 101
+        cores: 4
+        memory: 4096
+        ostype: "l26"
+        net:
+          net0: "virtio,bridge=vmbr0"
+        disk:
+          scsi0: "local-lvm:64,format=raw"
+        onboot: 1
+        agent: 1
+        autostart: 1
+
+  tasks:
+    - name: Создание виртуальных машин
+      community.general.proxmox_kvm:
+        api_host: "{{ proxmox_api_host }}"
+        api_user: "{{ proxmox_api_user }}"
+        api_password: "{{ proxmox_api_password }}"
+        node: "{{ proxmox_node }}"
+        name: "{{ item.name }}"
+        vmid: "{{ item.vmid }}"
+        cores: "{{ item.cores }}"
+        memory: "{{ item.memory }}"
+        ostype: "{{ item.ostype }}"
+        net: "{{ item.net }}"
+        disk: "{{ item.disk }}"
+        onboot: "{{ item.onboot }}"
+        agent: "{{ item.agent }}"
+        autostart: "{{ item.autostart }}"
+        state: present
+        validate_certs: no
+      loop: "{{ vms }}"
+      register: vm_result
+
+    - name: Вывод информации о созданных VM
+      debug:
+        msg: "Виртуальная машина {{ item.item.name }} (ID: {{ item.item.vmid }}) создана"
+      loop: "{{ vm_result.results }}"
+      when: item.changed 

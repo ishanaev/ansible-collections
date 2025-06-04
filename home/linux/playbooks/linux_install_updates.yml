@@ -1,0 +1,12 @@
+---
+- name: "Установка обновлений на сервер"
+  hosts: all
+  gather_facts: true
+  tasks:
+    - name: "Определение ОС"
+      ansible.builtin.set_fact:
+        os_version: "{{ ansible_distribution }}"
+
+    - name: "Дебаг"
+      ansible.builtin.debug:
+        var: os_version

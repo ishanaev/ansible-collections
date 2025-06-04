@@ -1,0 +1,24 @@
+---
+namespace: "home"
+name: "proxmox"
+version: "1.0.0"
+readme: "README.md"
+authors:
+  - "Your Name <your.email@example.com>"
+description: "Коллекция Ansible для управления Proxmox VE"
+license:
+  - "MIT"
+tags:
+  - proxmox
+  - virtualization
+  - lxc
+  - kvm
+repository: "https://github.com/your-username/proxmox-management"
+documentation: "https://github.com/your-username/proxmox-management/blob/main/README.md"
+homepage: "https://github.com/your-username/proxmox-management"
+issues: "https://github.com/your-username/proxmox-management/issues"
+dependencies:
+  community.general:
+    version: ">=7.0.0"
+  proxmox.proxmox:
+    version: ">=1.3.0" 

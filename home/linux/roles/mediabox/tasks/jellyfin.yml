@@ -1,0 +1,43 @@
+---
+- name: Update APT cache
+  apt:
+    update_cache: true
+
+- name: Install required packages
+  apt:
+    name:
+      - gnupg
+      - ca-certificates
+      - apt-transport-https
+      - curl
+      - software-properties-common
+    state: present
+
+- name: Add Jellyfin APT repo
+  shell: |
+    curl -fsSL https://repo.jellyfin.org/ubuntu/jellyfin_team.gpg.key | gpg --dearmor --batch --yes -o /etc/apt/trusted.gpg.d/jellyfin.gpg
+    echo "deb [arch=$( dpkg --print-architecture )] https://repo.jellyfin.org/$( awk -F'=' '/^ID=/{ print $NF }' /etc/os-release ) $( awk -F'=' '/^VERSION_CODENAME=/{ print $NF }' /etc/os-release ) main" | sudo tee /etc/apt/sources.list.d/jellyfin.list
+  args:
+    executable: /bin/bash
+
+- name: Install Jellyfin and Syncthing
+  apt:
+  # ansible.builtin.dnf:
+    name:
+      - jellyfin
+    state: present
+    update_cache: true
+
+- name: Enable and start Jellyfin
+  systemd:
+    name: jellyfin
+    enabled: true
+    state: started
+
+- name: Ensure /mnt/media exists in container
+  file:
+    path: /mnt/media
+    state: directory
+    owner: jellyfin
+    group: jellyfin
+    mode: "0755"

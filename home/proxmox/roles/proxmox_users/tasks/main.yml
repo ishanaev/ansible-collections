@@ -1,0 +1,47 @@
+---
+- name: Управление пользователями
+  community.general.proxmox_lxc:
+    api_host: "{{ proxmox_api_host }}"
+    api_user: "{{ proxmox_api_user }}"
+    api_password: "{{ proxmox_api_password }}"
+    node: "{{ proxmox_node }}"
+    vmid: "{{ vmid }}"
+    state: present
+    validate_certs: no
+    username: "{{ item.username }}"
+    password: "{{ item.password }}"
+    groups: "{{ item.groups | default(omit) }}"
+    shell: "{{ item.shell | default('/bin/bash') }}"
+    ssh_key: "{{ item.ssh_key | default(omit) }}"
+    remove_user: "{{ item.state == 'absent' }}"
+  loop: "{{ users }}"
+  register: user_result
+
+- name: Настройка sudo для пользователей
+  community.general.proxmox_lxc:
+    api_host: "{{ proxmox_api_host }}"
+    api_user: "{{ proxmox_api_user }}"
+    api_password: "{{ proxmox_api_password }}"
+    node: "{{ proxmox_node }}"
+    vmid: "{{ vmid }}"
+    state: present
+    validate_certs: no
+    sudo: "{{ item.groups is defined and 'sudo' in item.groups.split(',') }}"
+  loop: "{{ users }}"
+  when: 
+    - item.state == 'present'
+    - item.groups is defined
+    - 'sudo' in item.groups.split(',')
+  register: sudo_result
+
+- name: Вывод информации о пользователях
+  debug:
+    msg: "Пользователь {{ item.item.username }} {{ 'создан' if item.changed and item.item.state == 'present' else 'удален' if item.changed and item.item.state == 'absent' else 'не изменился' }}"
+  loop: "{{ user_result.results }}"
+  when: item.changed
+
+- name: Вывод информации о настройке sudo
+  debug:
+    msg: "Права sudo для пользователя {{ item.item.username }} {{ 'настроены' if item.changed else 'не изменились' }}"
+  loop: "{{ sudo_result.results }}"
+  when: item.changed 

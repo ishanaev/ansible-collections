@@ -1,0 +1,15 @@
+---
+- name: Проверка подключения к Proxmox
+  community.general.proxmox:
+    api_host: "{{ proxmox_api_host }}"
+    api_user: "{{ proxmox_api_user }}"
+    api_password: "{{ proxmox_api_password }}"
+    node: "{{ proxmox_node }}"
+    state: present
+    validate_certs: no
+  register: proxmox_status
+
+- name: Проверка доступности ноды
+  fail:
+    msg: "Нода {{ proxmox_node }} недоступна"
+  when: not proxmox_status.status | default(false) 

@@ -1,0 +1,2 @@
+- name: setup Jellyfin
+  ansible.builtin.include_tasks: tasks/jellyfin.yml

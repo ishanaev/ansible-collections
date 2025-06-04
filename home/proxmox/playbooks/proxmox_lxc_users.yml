@@ -1,0 +1,99 @@
+---
+- name: Управление пользователями в LXC контейнерах
+  hosts: proxmox
+  gather_facts: no
+  vars:
+    proxmox_api_host: "{{ ansible_host }}"
+    proxmox_api_user: "root@pam"
+    proxmox_api_password: "your_password"  # Рекомендуется использовать vault
+    proxmox_node: "pve"  # Имя вашего Proxmox ноды
+    containers:
+      - vmid: 200
+        name: "container1"
+        users:
+          - username: "admin"
+            password: "secure_password"  # Рекомендуется использовать vault
+            groups: "sudo,adm"
+            shell: "/bin/bash"
+            ssh_key: "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC6eNtGpNGwstc...."
+            state: present
+          - username: "deploy"
+            password: "deploy_password"  # Рекомендуется использовать vault
+            groups: "sudo"
+            shell: "/bin/bash"
+            state: present
+      - vmid: 201
+        name: "container2"
+        users:
+          - username: "app_user"
+            password: "app_password"  # Рекомендуется использовать vault
+            groups: "www-data"
+            shell: "/bin/bash"
+            state: present
+          - username: "old_user"
+            state: absent
+
+  tasks:
+    - name: Проверка доступности контейнеров
+      community.general.proxmox_lxc:
+        api_host: "{{ proxmox_api_host }}"
+        api_user: "{{ proxmox_api_user }}"
+        api_password: "{{ proxmox_api_password }}"
+        node: "{{ proxmox_node }}"
+        vmid: "{{ item.vmid }}"
+        state: present
+        validate_certs: no
+      loop: "{{ containers }}"
+      register: container_status
+
+    - name: Управление пользователями в контейнерах
+      community.general.proxmox_lxc:
+        api_host: "{{ proxmox_api_host }}"
+        api_user: "{{ proxmox_api_user }}"
+        api_password: "{{ proxmox_api_password }}"
+        node: "{{ proxmox_node }}"
+        vmid: "{{ item.0.vmid }}"
+        state: present
+        validate_certs: no
+        # Параметры пользователя
+        username: "{{ item.1.username }}"
+        password: "{{ item.1.password }}"
+        groups: "{{ item.1.groups | default(omit) }}"
+        shell: "{{ item.1.shell | default(omit) }}"
+        ssh_key: "{{ item.1.ssh_key | default(omit) }}"
+        # Удаление пользователя если state=absent
+        remove_user: "{{ item.1.state == 'absent' }}"
+      loop: "{{ containers | subelements('users') }}"
+      when: item.0.vmid in container_status.results | map(attribute='vmid') | list
+      register: user_result
+
+    - name: Вывод информации о созданных пользователях
+      debug:
+        msg: "Пользователь {{ item.item.1.username }} в контейнере {{ item.item.0.name }} (ID: {{ item.item.0.vmid }}) {{ 'создан' if item.changed and item.item.1.state == 'present' else 'удален' if item.changed and item.item.1.state == 'absent' else 'не изменился' }}"
+      loop: "{{ user_result.results }}"
+      when: item.changed
+
+    - name: Настройка sudoers для пользователей
+      community.general.proxmox_lxc:
+        api_host: "{{ proxmox_api_host }}"
+        api_user: "{{ proxmox_api_user }}"
+        api_password: "{{ proxmox_api_password }}"
+        node: "{{ proxmox_node }}"
+        vmid: "{{ item.0.vmid }}"
+        state: present
+        validate_certs: no
+        # Добавление пользователя в sudoers
+        sudo: "{{ item.1.groups is defined and 'sudo' in item.1.groups.split(',') }}"
+      loop: "{{ containers | subelements('users') }}"
+      when: 
+        - item.0.vmid in container_status.results | map(attribute='vmid') | list
+        - item.1.state == 'present'
+        - item.1.groups is defined
+        - 'sudo' in item.1.groups.split(',')
+      register: sudo_result
+
+    - name: Вывод информации о настройке sudo
+      debug:
+        msg: "Права sudo для пользователя {{ item.item.1.username }} в контейнере {{ item.item.0.name }} {{ 'настроены' if item.changed else 'не изменились' }}"
+      loop: "{{ sudo_result.results }}"
+      when: item.changed 

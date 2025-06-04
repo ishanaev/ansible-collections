@@ -1,0 +1,17 @@
+---
+- name: Create mount point directory on host
+  file:
+    path: "{{ host_mount_point }}"
+    state: directory
+    mode: '0755'
+
+- name: Mount the physical disk
+  mount:
+    path: "{{ host_mount_point }}"
+    src: "{{ physical_device }}"
+    fstype: "{{ filesystem_type | default('ext4') }}"
+    state: mounted
+
+- name: Attach disk mount to LXC container as mp0
+  shell:
+    cmd: "pct set {{ container_id }} -mp0 {{ host_mount_point }},mp={{ container_mount_point }}"

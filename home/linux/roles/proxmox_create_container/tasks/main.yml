@@ -6,7 +6,7 @@
 #     cmd: pip3 install -U proxmoxer requests
 - name: Load service config
   set_fact:
-    service_conf: "{{ lookup('vars', item) }}"
+    service_conf: "{{ lookup('vars', service) }}"
 
 - name: Install pip3 and proxmoxer
   apt:
@@ -16,7 +16,7 @@
       - python3-requests
     state: present
 
-- name: Create LXC container
+- name: "Create LXC container {{ service }}"
   community.general.proxmox:
     api_user: root@pam
     api_password: "{{ service_conf.host_api_passwd }}"
@@ -30,7 +30,7 @@
     memory: "{{ service_conf.container_memory }}"
     cores: "{{ service_conf.container_cores }}"
     pubkey: "{{ service_conf.container_pubkey }}"
-    description: "created with ansible"
+    description: "{{ service }} created with ansible"
     disk_volume:
       storage: "{{ service_conf.container_rootfs_storage }}"
       size: "{{ service_conf.container_rootfs_storage_size }}"
@@ -47,7 +47,7 @@
       # - mount=cifs,nfs
     validate_certs: false
 
-- name: Start LXC container
+- name: "Start LXC container {{ service }}"
   community.general.proxmox:
     api_user: root@pam
     api_password: "{{ service_conf.host_api_passwd }}"
@@ -56,26 +56,29 @@
     vmid: "{{ service_conf.container_id }}"
     state: started
     validate_certs: false
-
-- name: Get LXC container IP
+- name: "Pause"
+  ansible.builtin.pause:
+    seconds: 2
+    
+- name: "Get LXC container IP {{ service }}"
   shell:
-    cmd: pct exec {{ service_conf.container_id }} -- ip -4 addr show eth0
+    cmd: pct exec {{ service_conf.container_id }} -- bash -c "ip -4 addr show eth0"
   register: lxc_ip_result
   changed_when: false
 
-- name: Prepare LXC container
+- name: "Prepare LXC container {{ service }}"
   shell:
-    cmd: pct exec {{ service_conf.container_id }} -- bash -c "apt install -y openssh-server"
+    cmd: pct exec {{ service_conf.container_id }} -- bash -c "apt update && apt install -y openssh-server"
 
-- name: Enable SSH in container
+- name: "Enable SSH in container {{ service }}"
   shell:
     cmd: pct exec {{ service_conf.container_id }} -- bash -c "systemctl enable --now ssh"
 
-- name: Set IP fact
+- name: "Set IP fact {{ service }}"
   set_fact:
-    lxc_ip: "{{ lxc_ip_result.stdout | regex_search('inet ([0-9.]+)', '\\1') }}"
+    lxc_ip: "{{ lxc_ip_result.stdout | regex_search('inet (\\d+\\.\\d+\\.\\d+\\.\\d+)/\\d+', '\\1') }}"
 
-- name: Add container to inventory
+- name: "Add container {{ service }} to inventory"
   add_host:
     hostname: "{{ service_conf.container_name }}.{{ service_conf.container_search_domain }}"
     groups: "{{ service_conf.container_name }}"

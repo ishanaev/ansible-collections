@@ -4,6 +4,10 @@
 # - name: install proxmoxer and requests on the host
 #   shell:
 #     cmd: pip3 install -U proxmoxer requests
+- name: Load service config
+  set_fact:
+    service_conf: "{{ lookup('vars', item) }}"
+
 - name: Install pip3 and proxmoxer
   apt:
     name:
@@ -15,26 +19,26 @@
 - name: Create LXC container
   community.general.proxmox:
     api_user: root@pam
-    api_password: "{{ host_api_passwd }}"
+    api_password: "{{ service_conf.host_api_passwd }}"
     api_host: localhost
-    vmid: "{{ container_id }}"
-    password: "{{ container_passwd }}"
-    node: "{{ host_nodename }}"
-    hostname: "{{ container_name }}"
-    ostemplate: "{{ container_template }}"
-    searchdomain: "{{ container_search_domain }}"
-    memory: "{{ container_memory }}"
-    cores: "{{ container_cores }}"
-    pubkey: "{{ container_pubkey }}"
+    vmid: "{{ service_conf.container_id }}"
+    password: "{{ service_conf.container_passwd }}"
+    node: "{{ service_conf.host_nodename }}"
+    hostname: "{{ service_conf.container_name }}"
+    ostemplate: "{{ service_conf.container_template }}"
+    searchdomain: "{{ service_conf.container_search_domain }}"
+    memory: "{{ service_conf.container_memory }}"
+    cores: "{{ service_conf.container_cores }}"
+    pubkey: "{{ service_conf.container_pubkey }}"
     description: "created with ansible"
     disk_volume:
-      storage: "{{ container_rootfs_storage }}"
-      size: "{{ container_rootfs_storage_size }}"
+      storage: "{{ service_conf.container_rootfs_storage }}"
+      size: "{{ service_conf.container_rootfs_storage_size }}"
     mount_volumes:
       - id: mp0
-        storage: "{{ container_mount_storage }}"
-        size: "{{ container_mount_storage_size }}"
-        mountpoint: "{{ container_mount_point }}"
+        storage: "{{ service_conf.container_mount_storage }}"
+        size: "{{ service_conf.container_mount_storage_size }}"
+        mountpoint: "{{ service_conf.container_mount_point }}"
     netif:
       net0: "name=eth0,bridge=vmbr0,ip=dhcp,firewall=1"
     state: present
@@ -46,26 +50,26 @@
 - name: Start LXC container
   community.general.proxmox:
     api_user: root@pam
-    api_password: "{{ host_api_passwd }}"
+    api_password: "{{ service_conf.host_api_passwd }}"
     api_host: localhost
-    node: "{{ host_nodename }}"
-    vmid: "{{ container_id }}"
+    node: "{{ service_conf.host_nodename }}"
+    vmid: "{{ service_conf.container_id }}"
     state: started
     validate_certs: false
 
 - name: Get LXC container IP
   shell:
-    cmd: pct exec {{ container_id }} -- ip -4 addr show eth0
+    cmd: pct exec {{ service_conf.container_id }} -- ip -4 addr show eth0
   register: lxc_ip_result
   changed_when: false
 
 - name: Prepare LXC container
   shell:
-    cmd: pct exec {{ container_id }} -- bash -c "apt install -y openssh-server"
+    cmd: pct exec {{ service_conf.container_id }} -- bash -c "apt install -y openssh-server"
 
 - name: Enable SSH in container
   shell:
-    cmd: pct exec {{ container_id }} -- bash -c "systemctl enable --now ssh"
+    cmd: pct exec {{ service_conf.container_id }} -- bash -c "systemctl enable --now ssh"
 
 - name: Set IP fact
   set_fact:
@@ -73,7 +77,7 @@
 
 - name: Add container to inventory
   add_host:
-    hostname: "{{ container_name }}.{{ container_search_domain }}"
-    groups: "{{ container_name }}"
+    hostname: "{{ service_conf.container_name }}.{{ service_conf.container_search_domain }}"
+    groups: "{{ service_conf.container_name }}"
     ansible_host: "{{ lxc_ip[0] }}"
     ansible_user: root

@@ -78,9 +78,9 @@
   set_fact:
     lxc_ip: "{{ lxc_ip_result.stdout | regex_search('inet (\\d+\\.\\d+\\.\\d+\\.\\d+)/\\d+', '\\1') }}"
 
-- name: "Add container {{ service }} to inventory"
-  add_host:
-    hostname: "{{ service_conf.container_name }}.{{ service_conf.container_search_domain }}"
-    groups: "{{ service_conf.container_name }}"
-    ansible_host: "{{ lxc_ip[0] }}"
-    ansible_user: root
+# - name: "Add container {{ service }} to inventory"
+#   add_host:
+#     hostname: "{{ service_conf.container_name }}.{{ service_conf.container_search_domain }}"
+#     groups: "{{ service_conf.container_name }}"
+#     ansible_host: "{{ lxc_ip[0] }}"
+#     ansible_user: root

@@ -1,3 +1,64 @@
 #SPDX-License-Identifier: MIT-0
 ---
 # tasks file for openldap_setup
+- name: Load service config
+  set_fact:
+    service_conf: "{{ lookup('vars', service) }}"
+
+- name: Install OpenLDAP and utilities
+  apt:
+    name:
+      - slapd
+      - ldap-utils
+      - debconf-utils
+    state: present
+    update_cache: true
+
+- name: Reconfigure slapd non-interactively
+  debconf:
+    name: slapd
+    question: "{{ item.question }}"
+    value: "{{ item.value }}"
+    vtype: "{{ item.vtype }}"
+  loop:
+    - { question: "slapd/internal/generated_adminpw", value: "{{ service_conf.ldap_admin_pw }}", vtype: "password" }
+    - { question: "slapd/internal/adminpw", value: "{{ service_conf.ldap_admin_pw }}", vtype: "password" }
+    - { question: "slapd/password1", value: "{{ service_conf.ldap_admin_pw }}", vtype: "password" }
+    - { question: "slapd/password2", value: "{{ service_conf.ldap_admin_pw }}", vtype: "password" }
+    - { question: "slapd/domain", value: "{{ service_conf.ldap_domain }}", vtype: "string" }
+    - { question: "slapd/organization", value: "{{ service_conf.ldap_org }}", vtype: "string" }
+    - { question: "slapd/no_configuration", value: "false", vtype: "boolean" }
+
+- name: Run dpkg-reconfigure for slapd
+  shell: "dpkg-reconfigure -f noninteractive slapd"
+
+- name: Create LDIF
+  copy:
+    dest: "/tmp/{{ item.cn }}.ldif"
+    content: |
+      # LDIF entry for new user {{ item.cn }}
+      dn: cn={{ item.cn }},{{ service_conf.ldap_base_dn }}
+      objectClass: {{ service_conf.ldap_object_class }}
+      cn: {{ item.cn }}
+      sn: {{ item.sn }}
+      userPassword: {{ item.password }}
+  loop: "{{ service_conf.ldap_users }}"
+
+- name: Add users to LDAP
+  shell: "ldapadd -x -D cn=admin,{{ service_conf.ldap_base_dn }} -w {{ service_conf.ldap_admin_pw }} -f /tmp/{{ item.cn }}.ldif"
+  loop: "{{ service_conf.ldap_users }}"
+
+- name: Create LDIF to update password
+  copy:
+    dest: "/tmp/{{ item.cn }}-pw.ldif"
+    content: |
+      # LDIF password update for user {{ item.cn }}
+      dn: cn={{ item.cn }},{{ service_conf.ldap_base_dn }}
+      changetype: modify
+      replace: userPassword
+      userPassword: {{ item.password }}
+  loop: "{{ service_conf.ldap_users }}"
+
+- name: Apply password update
+  shell: "ldapmodify -x -D cn=admin,{{ service_conf.ldap_base_dn }} -w {{ service_conf.ldap_admin_pw }} -f /tmp/{{ item.cn }}-pw.ldif"
+  loop: "{{ service_conf.ldap_users }}"

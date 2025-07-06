@@ -1,0 +1,192 @@
+#SPDX-License-Identifier: MIT-0
+---
+  - name: Load service config
+    set_fact:
+      service_conf: "{{ lookup('vars', service) }}"
+
+  - name: apt update
+    apt:
+      update_cache: yes
+        
+  - name: Install chrony
+    apt:
+      name: chrony
+      state: present
+
+  - name: Set timezone
+    command: timedatectl set-timezone "{{ service_conf.timezone }}"
+
+  - name: Enable chrony
+    systemd:
+      name: chrony
+      enabled: yes
+      state: started
+
+  - name: Install MariaDB
+    apt:
+      name:
+        - mariadb-server
+        - python3-mysqldb
+      state: present
+
+  - name: Ensure MariaDB is started and enabled
+    service:
+      name: mariadb
+      state: started
+      enabled: yes
+
+  - name: Create Nextcloud database and user
+    mysql_db:
+      name: "{{ service_conf.db_name }}"
+      encoding: utf8
+      collation: utf8_general_ci
+      state: present
+
+  - name: Create DB user
+    mysql_user:
+      name: "{{ service_conf.db_user }}"
+      password: "{{ service_conf.db_password }}"
+      priv: "{{ service_conf.db_name }}.*:ALL"
+      host: localhost
+      state: present
+
+  - name: Install PHP and FPM + extensions
+    apt:
+      name:
+        - php{{ service_conf.php_ver }}-fpm
+        - php{{ service_conf.php_ver }}-common
+        - php{{ service_conf.php_ver }}-gd
+        - php{{ service_conf.php_ver }}-xml
+        - php{{ service_conf.php_ver }}-mbstring
+        - php{{ service_conf.php_ver }}-zip
+        - php{{ service_conf.php_ver }}-curl
+        - php{{ service_conf.php_ver }}-mysql
+        - php{{ service_conf.php_ver }}-intl
+        - php{{ service_conf.php_ver }}-imagick
+      state: present
+
+  - name: Configure php-fpm env PATH
+    lineinfile:
+      path: "/etc/php/{{ service_conf.php_ver }}/fpm/pool.d/www.conf"
+      regexp: '^;?env\[PATH\]'
+      line: 'env[PATH] = /usr/local/bin:/usr/bin:/bin'
+    notify: Restart PHP-FPM
+
+  - name: Tweak php.ini opcache
+    ini_file:
+      path: "/etc/php/{{ service_conf.php_ver }}/fpm/php.ini"
+      section: PHP
+      option: "{{ item.option }}"
+      value: "{{ item.value }}"
+    loop:
+      - { option: opcache.enable_cli, value: '1' }
+      - { option: opcache.interned_strings_buffer, value: '32' }
+      - { option: opcache.revalidate_freq, value: '1' }
+    notify: Restart PHP-FPM
+
+  - name: Enable php-fpm
+    systemd:
+      name: "php{{ service_conf.php_ver }}-fpm"
+      enabled: yes
+      state: restarted
+
+  - name: Install unzip
+    apt:
+      name: unzip
+      state: present
+
+  - name: Download Nextcloud
+    get_url:
+      url: https://download.nextcloud.com/server/releases/latest.zip
+      dest: /tmp/nextcloud.zip
+
+  - name: Create /var/www directory
+    file:
+      path: /var/www
+      state: directory
+      mode: '0755'
+
+  - name: Unzip Nextcloud
+    unarchive:
+      src: /tmp/nextcloud.zip
+      dest: /var/www/
+      remote_src: yes
+      creates: "{{ service_conf.nextcloud_root_dir }}"
+
+  - name: Set permissions
+    file:
+      path: "{{ service_conf.nextcloud_root_dir }}"
+      owner: www-data
+      group: www-data
+      recurse: yes
+
+  - name: Install NGINX
+    apt:
+      name: nginx
+      state: present
+
+  - name: Configure NGINX site
+    template:
+      src: nextcloud.conf.j2
+      dest: /etc/nginx/sites-available/nextcloud.conf
+    notify: Reload NGINX
+
+  - name: Enable site
+    file:
+      src: /etc/nginx/sites-available/nextcloud.conf
+      dest: /etc/nginx/sites-enabled/nextcloud.conf
+      state: link
+    notify: Reload NGINX
+
+  - name: Run initial Nextcloud setup
+    shell: >
+      php {{ service_conf.nextcloud_root_dir }}/occ maintenance:install
+      --admin-user {{ service_conf.nextcloud_admin_user }}
+      --admin-pass '{{ service_conf.nextcloud_admin_pass }}'
+      --database-name {{ service_conf.db_name }}
+      --database-user {{ service_conf.db_user }}
+      --database-pass '{{ service_conf.db_password }}'
+      --database mysql
+    args:
+      chdir: "{{ service_conf.nextcloud_root_dir }}"
+      creates: "{{ service_conf.nextcloud_root_dir }}/config/config.php"
+    become_user: www-data
+  
+  - name: Set trusted trusted domains
+    shell: >
+      php {{ service_conf.nextcloud_root_dir }}/occ config:system:set
+      trusted_domains 2 --value={{ service_conf.nextcloud_domain }}
+    args:
+      chdir: "{{ service_conf.nextcloud_root_dir }}"
+    become_user: www-data
+  
+  - name: Optimise Nextcloud DB indices
+    shell: >
+      php occ db:convert-filecache-bigint &&
+      php occ db:add-missing-indices
+    args:
+      chdir: "{{ service_conf.nextcloud_root_dir }}"
+    become_user: www-data
+
+  - name: Ensure cron installed
+    apt:
+      name: cron
+      state: present
+
+  - name: Setup cron job for Nextcloud
+    cron:
+      name: "Nextcloud cron job"
+      user: www-data
+      minute: "*/5"
+      job: "/usr/bin/php {{ service_conf.nextcloud_root_dir }}/cron.php"
+
+  - name: Ensure services are enabled on boot
+    systemd:
+      name: "{{ item }}"
+      enabled: yes
+      state: started
+    loop:
+      - nginx
+      - php{{ service_conf.php_ver }}-fpm
+      - mariadb
+      - cron

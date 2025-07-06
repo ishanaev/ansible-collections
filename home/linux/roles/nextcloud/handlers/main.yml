@@ -1,0 +1,12 @@
+#SPDX-License-Identifier: MIT-0
+---
+# handlers file for nextcloud
+- name: Restart PHP-FPM
+  service:
+    name: "php{{ service_conf.php_ver }}-fpm"
+    state: restarted
+
+- name: Reload NGINX
+  service:
+    name: nginx
+    state: reloaded

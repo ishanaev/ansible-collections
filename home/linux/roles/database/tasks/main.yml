@@ -1,7 +1,9 @@
 # tasks for database
 - name: Install MariaDB
   apt:
-    name: mariadb-server
+    name: 
+      - mariadb-server
+      - python3-pymysql
     state: present
 
 - name: Ensure MariaDB is running

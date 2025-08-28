@@ -1,0 +1,27 @@
+server {
+    listen 80;
+    server_name {{ mail_domain }};
+
+    root /var/www;
+    index index.php index.html;
+
+    location /postfixadmin {
+        root /var/www;
+        index index.php;
+        location ~ \.php$ {
+            include fastcgi_params;
+            fastcgi_pass unix:{{ php_fpm_sock }};
+            fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+        }
+    }
+
+    location /roundcube {
+        root /var/www;
+        index index.php;
+        location ~ \.php$ {
+            include fastcgi_params;
+            fastcgi_pass unix:{{ php_fpm_sock }};
+            fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+        }
+    }
+}

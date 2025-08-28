@@ -1,0 +1,10 @@
+# tasks for antispam
+- name: Install antispam packages
+  apt:
+    name: [rspamd, clamav, clamav-daemon, clamav-milter]
+    state: present
+
+- name: Configure ClamAV milter
+  template:
+    src: clamav-milter.conf.j2
+    dest: /etc/clamav/clamav-milter.conf

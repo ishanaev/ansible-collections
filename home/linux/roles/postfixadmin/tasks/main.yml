@@ -1,0 +1,16 @@
+# tasks for postfixadmin
+- name: Download PostfixAdmin
+  get_url:
+    url: https://github.com/postfixadmin/postfixadmin/archive/refs/tags/postfixadmin-3.3.13.tar.gz
+    dest: /tmp/postfixadmin.tar.gz
+
+- name: Extract PostfixAdmin
+  unarchive:
+    src: /tmp/postfixadmin.tar.gz
+    dest: /var/www/
+    remote_src: yes
+
+- name: Configure postfixadmin
+  template:
+    src: config.local.php.j2
+    dest: /var/www/postfixadmin/config.local.php

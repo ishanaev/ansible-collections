@@ -1,0 +1,11 @@
+<?php
+$CONF['database_type'] = 'mysqli';
+$CONF['database_host'] = 'localhost';
+$CONF['database_user'] = '{{ mail_db_users[1].name }}';
+$CONF['database_password'] = '{{ mail_db_users[1].pass }}';
+$CONF['database_name'] = '{{ postfixadmin_db }}';
+$CONF['default_language'] = 'en';
+$CONF['encrypt'] = 'dovecot:SHA512-CRYPT';
+$CONF['configured'] = true;
+$CONF['admin_email'] = 'postmaster@{{ mail_domain }}';
+?>

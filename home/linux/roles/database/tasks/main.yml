@@ -1,0 +1,29 @@
+# tasks for database
+- name: Install MariaDB
+  apt:
+    name: mariadb-server
+    state: present
+
+- name: Ensure MariaDB is running
+  service:
+    name: mariadb
+    state: started
+    enabled: yes
+
+- name: Create mail databases
+  mysql_db:
+    name: "{{ item }}"
+    state: present
+  loop:
+    - "{{ mail_db }}"
+    - "{{ postfixadmin_db }}"
+    - "{{ roundcube_db }}"
+
+- name: Create mail users
+  mysql_user:
+    name: "{{ item.name }}"
+    password: "{{ item.pass }}"
+    priv: "{{ item.db }}.*:ALL"
+    host: "%"
+    state: present
+  loop: "{{ mail_db_users }}"

@@ -1,0 +1,11 @@
+# tasks for security
+- name: Install Fail2ban
+  apt:
+    name: fail2ban
+    state: present
+
+- name: Deploy jail.local
+  template:
+    src: jail.local.j2
+    dest: /etc/fail2ban/jail.local
+  notify: Restart fail2ban

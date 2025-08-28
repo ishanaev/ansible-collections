@@ -1,0 +1,9 @@
+# tasks for common
+- name: Update apt cache
+  apt:
+    update_cache: yes
+
+- name: Install base tools
+  apt:
+    name: [wget, curl, unzip, git]
+    state: present

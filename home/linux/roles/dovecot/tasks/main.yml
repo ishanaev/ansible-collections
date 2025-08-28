@@ -1,0 +1,11 @@
+# tasks for dovecot
+- name: Install Dovecot
+  apt:
+    name: [dovecot-core, dovecot-imapd, dovecot-pop3d, dovecot-mysql]
+    state: present
+
+- name: Deploy config
+  template:
+    src: dovecot.conf.j2
+    dest: /etc/dovecot/dovecot.conf
+  notify: Restart dovecot

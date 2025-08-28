@@ -1,0 +1,12 @@
+disable_plaintext_auth = yes
+mail_location = maildir:/var/mail/vhosts/%d/%n
+auth_mechanisms = plain login
+!include conf.d/*.conf
+
+service auth {
+  unix_listener /var/spool/postfix/private/auth {
+    mode = 0660
+    user = postfix
+    group = postfix
+  }
+}

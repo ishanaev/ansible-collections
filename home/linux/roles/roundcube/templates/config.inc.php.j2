@@ -1,0 +1,12 @@
+<?php
+$config['db_dsnw'] = 'mysql://{{ mail_db_users[2].name }}:{{ mail_db_users[2].pass }}@localhost/{{ roundcube_db }}';
+$config['default_host'] = 'ssl://{{ mail_hostname }}';
+$config['default_port'] = 993;
+$config['smtp_server'] = 'tls://{{ mail_hostname }}';
+$config['smtp_port'] = 587;
+$config['smtp_user'] = '%u';
+$config['smtp_pass'] = '%p';
+$config['product_name'] = 'Roundcube Webmail';
+$config['des_key'] = 'CHANGE_ME_RANDOM_KEY';
+$config['language'] = 'en_US';
+?>

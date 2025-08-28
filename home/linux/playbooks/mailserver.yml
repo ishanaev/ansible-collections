@@ -1,0 +1,14 @@
+- name: Configure full mailserver
+  hosts: mailservers
+  become: true
+
+  roles:
+    - common
+    - database
+    - postfix
+    - dovecot
+    - postfixadmin
+    - roundcube
+    - webserver
+    - antispam
+    - security

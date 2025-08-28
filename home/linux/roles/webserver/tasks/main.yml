@@ -1,0 +1,11 @@
+# tasks for webserver
+- name: Install Angie
+  apt:
+    name: angie
+    state: present
+
+- name: Deploy vhost
+  template:
+    src: mail.conf.j2
+    dest: /etc/angie/conf.d/mail.conf
+  notify: Restart angie

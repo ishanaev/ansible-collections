@@ -29,4 +29,5 @@
     priv: "{{ item.db }}.*:ALL"
     host: "%"
     state: present
+    login_unix_socket: /run/mysqld/mysqld.sock
   loop: "{{ mail_db_users }}"

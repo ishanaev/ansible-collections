@@ -15,6 +15,7 @@
 - name: Create mail databases
   mysql_db:
     name: "{{ item }}"
+    login_unix_socket: /run/mysqld/mysqld.sock
     state: present
   loop:
     - "{{ mail_db }}"
